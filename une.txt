@@ -1,0 +1,277 @@
+-- Roblox Server Joiner with GUI
+-- Joins different servers and sends custom messages repeatedly
+
+local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+
+local ServerJoiner = {}
+ServerJoiner.isRunning = false
+ServerJoiner.selectedServers = {}
+ServerJoiner.customMessage = ""
+ServerJoiner.repeatDelay = 5 -- Seconds between server joins
+
+-- Create GUI
+function ServerJoiner:createGUI()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "ServerJoinerGUI"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+    -- Main Frame
+    local mainFrame = Instance. new("Frame")
+    mainFrame.Name = "MainFrame"
+    mainFrame.Size = UDim2.new(0, 400, 0, 500)
+    mainFrame.Position = UDim2.new(0. 5, -200, 0.5, -250)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    mainFrame.BorderSizePixel = 2
+    mainFrame.BorderColor3 = Color3.fromRGB(0, 200, 100)
+    mainFrame.Parent = screenGui
+
+    -- Title
+    local title = Instance.new("TextLabel")
+    title.Name = "Title"
+    title.Size = UDim2.new(1, 0, 0, 40)
+    title.BackgroundColor3 = Color3.fromRGB(0, 150, 75)
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.TextSize = 18
+    title.Text = "🖥️ Roblox Server Joiner"
+    title. Font = Enum.Font.GothamBold
+    title. Parent = mainFrame
+
+    -- Message Input Label
+    local msgLabel = Instance.new("TextLabel")
+    msgLabel.Name = "MessageLabel"
+    msgLabel.Size = UDim2.new(1, -20, 0, 20)
+    msgLabel.Position = UDim2.new(0, 10, 0, 50)
+    msgLabel.BackgroundTransparency = 1
+    msgLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    msgLabel.TextSize = 12
+    msgLabel.Text = "Custom Message:"
+    msgLabel.Font = Enum.Font. Gotham
+    msgLabel.TextXAlignment = Enum.TextXAlignment.Left
+    msgLabel.Parent = mainFrame
+
+    -- Message Input Box
+    local messageInput = Instance.new("TextBox")
+    messageInput.Name = "MessageInput"
+    messageInput. Size = UDim2.new(1, -20, 0, 35)
+    messageInput.Position = UDim2.new(0, 10, 0, 75)
+    messageInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    messageInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+    messageInput.TextSize = 12
+    messageInput. PlaceholderText = "Enter message to send..."
+    messageInput.ClearTextOnFocus = false
+    messageInput. Parent = mainFrame
+
+    -- Delay Input Label
+    local delayLabel = Instance.new("TextLabel")
+    delayLabel.Name = "DelayLabel"
+    delayLabel.Size = UDim2.new(1, -20, 0, 20)
+    delayLabel.Position = UDim2.new(0, 10, 0, 120)
+    delayLabel.BackgroundTransparency = 1
+    delayLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    delayLabel.TextSize = 12
+    delayLabel.Text = "Delay Between Joins (seconds):"
+    delayLabel.Font = Enum.Font.Gotham
+    delayLabel.TextXAlignment = Enum.TextXAlignment.Left
+    delayLabel.Parent = mainFrame
+
+    -- Delay Input Box
+    local delayInput = Instance.new("TextBox")
+    delayInput.Name = "DelayInput"
+    delayInput.Size = UDim2.new(1, -20, 0, 35)
+    delayInput.Position = UDim2.new(0, 10, 0, 145)
+    delayInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    delayInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+    delayInput.TextSize = 12
+    delayInput.Text = "5"
+    delayInput.Parent = mainFrame
+
+    -- Status Label
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.Name = "StatusLabel"
+    statusLabel.Size = UDim2.new(1, -20, 0, 50)
+    statusLabel.Position = UDim2.new(0, 10, 0, 190)
+    statusLabel.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    statusLabel.TextColor3 = Color3.fromRGB(100, 200, 100)
+    statusLabel.TextSize = 11
+    statusLabel.Text = "Status: Ready\n"
+    statusLabel.Font = Enum.Font.Gotham
+    statusLabel.TextWrapped = true
+    statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    statusLabel.TextYAlignment = Enum.TextYAlignment.Top
+    statusLabel.Parent = mainFrame
+
+    -- Start Button
+    local startButton = Instance.new("TextButton")
+    startButton.Name = "StartButton"
+    startButton.Size = UDim2.new(0. 48, -5, 0, 40)
+    startButton.Position = UDim2.new(0, 10, 0, 250)
+    startButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    startButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    startButton.TextSize = 14
+    startButton.Text = "▶️ START"
+    startButton.Font = Enum.Font.GothamBold
+    startButton.Parent = mainFrame
+
+    -- Stop Button
+    local stopButton = Instance. new("TextButton")
+    stopButton.Name = "StopButton"
+    stopButton.Size = UDim2.new(0.48, -5, 0, 40)
+    stopButton.Position = UDim2.new(0.52, 0, 0, 250)
+    stopButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    stopButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    stopButton.TextSize = 14
+    stopButton.Text = "⏹️ STOP"
+    stopButton.Font = Enum.Font.GothamBold
+    stopButton.Parent = mainFrame
+
+    -- Server List Label
+    local serverListLabel = Instance.new("TextLabel")
+    serverListLabel.Name = "ServerListLabel"
+    serverListLabel.Size = UDim2.new(1, -20, 0, 20)
+    serverListLabel.Position = UDim2.new(0, 10, 0, 300)
+    serverListLabel.BackgroundTransparency = 1
+    serverListLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    serverListLabel.TextSize = 12
+    serverListLabel. Text = "Available Servers:"
+    serverListLabel.Font = Enum.Font. Gotham
+    serverListLabel.TextXAlignment = Enum. TextXAlignment.Left
+    serverListLabel.Parent = mainFrame
+
+    -- Server List ScrollingFrame
+    local serverListFrame = Instance.new("ScrollingFrame")
+    serverListFrame.Name = "ServerListFrame"
+    serverListFrame.Size = UDim2.new(1, -20, 0, 120)
+    serverListFrame.Position = UDim2.new(0, 10, 0, 325)
+    serverListFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    serverListFrame.ScrollBarThickness = 6
+    serverListFrame. CanvasSize = UDim2.new(0, 0, 0, 0)
+    serverListFrame.Parent = mainFrame
+
+    -- Button Connections
+    startButton.MouseButton1Click:Connect(function()
+        ServerJoiner. customMessage = messageInput.Text
+        ServerJoiner.repeatDelay = tonumber(delayInput.Text) or 5
+        
+        if ServerJoiner.customMessage == "" then
+            statusLabel.Text = "Status: ❌ Error\nPlease enter a message!"
+            return
+        end
+        
+        statusLabel.Text = "Status: ✅ Running.. .\nFetching servers..."
+        ServerJoiner: start(statusLabel, serverListFrame)
+    end)
+
+    stopButton.MouseButton1Click:Connect(function()
+        ServerJoiner:stop(statusLabel)
+    end)
+
+    return screenGui, statusLabel, serverListFrame
+end
+
+-- Fetch available servers from the game
+function ServerJoiner:fetchServers()
+    local servers = {}
+    
+    pcall(function()
+        local response = HttpService:GetAsync("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public? sortOrder=Asc&limit=100")
+        local data = HttpService:JSONDecode(response)
+        
+        if data. data then
+            for _, server in ipairs(data.data) do
+                table.insert(servers, {
+                    id = server.id,
+                    playerCount = server.playerCount,
+                    maxPlayers = server.maxPlayers
+                })
+            end
+        end
+    end)
+    
+    return servers
+end
+
+-- Display servers in GUI
+function ServerJoiner:displayServers(serverList, frame)
+    frame.CanvasSize = UDim2.new(0, 0, 0, #serverList * 30)
+    
+    for _, child in ipairs(frame: GetChildren()) do
+        child: Destroy()
+    end
+    
+    for i, server in ipairs(serverList) do
+        local serverButton = Instance.new("TextButton")
+        serverButton.Name = "Server_" .. i
+        serverButton. Size = UDim2.new(1, -10, 0, 25)
+        serverButton.Position = UDim2.new(0, 5, 0, (i-1) * 30)
+        serverButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+        serverButton.TextColor3 = Color3.fromRGB(200, 255, 200)
+        serverButton.TextSize = 11
+        serverButton.Text = "Server ID: " .. server.id ..  " | Players: " .. server.playerCount ..  "/" .. server.maxPlayers
+        serverButton.Font = Enum. Font.Gotham
+        serverButton.Parent = frame
+        
+        serverButton.MouseButton1Click:Connect(function()
+            ServerJoiner:joinServer(server.id)
+        end)
+    end
+end
+
+-- Join a specific server
+function ServerJoiner:joinServer(serverId)
+    pcall(function()
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, serverId, Players.LocalPlayer)
+    end)
+end
+
+-- Send message in chat
+function ServerJoiner:sendMessage(message)
+    pcall(function()
+        local textChatService = game:GetService("TextChatService")
+        if textChatService and textChatService.ChatInputTextChannel then
+            textChatService. ChatInputTextChannel:SendAsync(message)
+        end
+    end)
+end
+
+-- Start the loop
+function ServerJoiner:start(statusLabel, serverListFrame)
+    self.isRunning = true
+    
+    while self.isRunning do
+        local servers = self:fetchServers()
+        
+        if #servers > 0 then
+            self: displayServers(servers, serverListFrame)
+            
+            -- Join a random server
+            local randomServer = servers[math.random(1, #servers)]
+            statusLabel.Text = "Status: 🔄 Joining...\nServer: " .. randomServer.id
+            
+            wait(1)
+            self:joinServer(randomServer.id)
+            
+            wait(3) -- Wait for game to load
+            self:sendMessage(self.customMessage)
+            
+            statusLabel.Text = "Status: ✅ Message Sent!\nWaiting " .. self.repeatDelay .. "s..."
+            wait(self. repeatDelay)
+        else
+            statusLabel.Text = "Status: ❌ No servers found"
+            wait(5)
+        end
+    end
+end
+
+-- Stop the loop
+function ServerJoiner:stop(statusLabel)
+    self.isRunning = false
+    statusLabel.Text = "Status: ⏹️ Stopped"
+end
+
+-- Initialize
+local screenGui, statusLabel, serverListFrame = ServerJoiner:createGUI()
+
+print("✅ Server Joiner GUI loaded!  Click START to begin.")
